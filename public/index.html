@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset='utf-8'>
+    <title>Movimento de Camera</title>
+    <style>
+      body {
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <script type="module">
+      import * as THREE from '/build/three.module.js';
+      import { FlyControls } from 'https://threejs.org/examples/jsm/controls/FlyControls.js';
+
+      let SCREEN_WIDTH = window.innerWidth; //Largura
+      let SCREEN_HEIGHT = window.innerHeight; //Altura
+      let aspect_ratio = SCREEN_WIDTH / SCREEN_HEIGHT; //Proporção 
+
+      let camera, scene, renderer, axesHelper, controls;
+      let geometry, texture, material, DeathStar, TerraPlana;
+
+      function init(){
+        scene = new THREE.Scene(); 
+        camera = new THREE.PerspectiveCamera(70, aspect_ratio, 0.1, 1000);
+        camera.position.set(3, 3, 10);
+        
+        renderer = new THREE.WebGLRenderer({antialias: true});
+        renderer.setSize(SCREEN_WIDTH, SCREEN_HEIGHT);
+        document.body.appendChild(renderer.domElement);
+
+        axesHelper = new THREE.AxesHelper(1000);
+        scene.add(axesHelper); 
+
+        window.addEventListener('resize', onWindowResize);
+
+        controls = new FlyControls(camera, renderer.domElement);
+        controls.object = camera; // Camera a ser controlada
+        controls.domElement = renderer.domElement; // Serve para ler os comandos do mouse
+        controls.autoForward = false; // Para que a camera não se mova sozinha, apenas com o click.
+        controls.dragToLook = false; // Para o cursor do mouse rotacionar a camera
+        controls.movementSpeed = 0.1; // Velocidade de movimento da camera
+        controls.rollSpeed = 0.03; // Velocidade de rotação
+      }
+
+      function createPlanet(){
+        geometry = new THREE.SphereGeometry(1, 20, 20);
+        texture = new THREE.TextureLoader().load('textures/DeathStar.png');
+        material = new THREE.MeshBasicMaterial({ map: texture });
+        DeathStar = new THREE.Mesh(geometry, material);
+        scene.add(DeathStar);
+
+        DeathStar.position.x = 3;
+        DeathStar.position.y = 2;
+      }
+
+      function createFlatEarth(){
+        geometry = new THREE.CircleGeometry(1, 20);
+        texture = new THREE.TextureLoader().load('textures/FlatEarth.png');
+        material = new THREE.MeshBasicMaterial({ map: texture});
+        TerraPlana = new THREE.Mesh(geometry, material);
+        scene.add(TerraPlana);
+          
+        TerraPlana.position.x = 1;
+      }  
+
+      function onWindowResize(){
+        SCREEN_WIDTH = window.innerWidth;
+        SCREEN_HEIGHT = window.innerHeight;
+        aspect_ratio = SCREEN_WIDTH / SCREEN_HEIGHT;
+        renderer.setSize(SCREEN_WIDTH, SCREEN_HEIGHT);
+        active_camera.aspect = aspect_ratio;
+        active_camera.updateProjectionMatriX();
+      }
+      
+      let cont = 0;
+      let cont2 = 0;
+      
+      function Movimento(){
+        cont++;
+        if (cont < 40){
+          DeathStar.position.x = DeathStar.position.x - 0.08
+          DeathStar.position.z = DeathStar.position.z + 0.08
+        }else if (cont >= 40 && cont < 80){
+          DeathStar.position.x = DeathStar.position.x - 0.08
+          DeathStar.position.z = DeathStar.position.z - 0.08
+        }else if (cont >= 80 && cont < 120){
+          DeathStar.position.x = DeathStar.position.x + 0.08
+          DeathStar.position.z = DeathStar.position.z - 0.08
+        }else if (cont >= 120 && cont < 160){
+          DeathStar.position.x = DeathStar.position.x + 0.08
+          DeathStar.position.z = DeathStar.position.z + 0.08
+        }else{
+          cont = 0;
+        }
+        DeathStar.rotation.y -= 0.05;
+
+        cont2++;
+        if (cont2 < 30){
+          TerraPlana.position.x = TerraPlana.position.x - 0.05
+          TerraPlana.position.y = TerraPlana.position.y + 0.05
+        }else if (cont2 >= 30 && cont2 < 60){
+          TerraPlana.position.x = TerraPlana.position.x - 0.05
+          TerraPlana.position.y = TerraPlana.position.y - 0.05
+        }else if (cont2 >= 60 && cont2 < 90){
+          TerraPlana.position.x = TerraPlana.position.x + 0.05
+          TerraPlana.position.y = TerraPlana.position.y - 0.05
+        }else if (cont2 >= 90 && cont2 < 120){
+          TerraPlana.position.x = TerraPlana.position.x + 0.05
+          TerraPlana.position.y = TerraPlana.position.y + 0.05
+        }else{
+          cont2 = 0;
+        }
+        TerraPlana.rotation.z += 0.06;
+      }
+
+      const animate = function () {
+        requestAnimationFrame(animate);
+        Movimento();
+        controls.update(1);
+        renderer.render(scene, camera);
+      };
+
+      init();
+      createPlanet();
+      createFlatEarth();
+      animate();
+    </script>
+  </body>
+</html>
