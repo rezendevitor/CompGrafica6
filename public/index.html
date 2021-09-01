@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset='utf-8'>
-    <title>Movimento de Camera</title>
+    <title>Shaders</title>
     <style>
       body {
         margin: 0;
@@ -12,14 +12,76 @@
   <body>
     <script type="module">
       import * as THREE from '/build/three.module.js';
-      import { FlyControls } from 'https://threejs.org/examples/jsm/controls/FlyControls.js';
+      import { OrbitControls } from 'https://threejs.org/examples/jsm/controls/OrbitControls.js';
 
       let SCREEN_WIDTH = window.innerWidth; //Largura
       let SCREEN_HEIGHT = window.innerHeight; //Altura
       let aspect_ratio = SCREEN_WIDTH / SCREEN_HEIGHT; //Proporção 
 
-      let camera, scene, renderer, axesHelper, controls;
-      let geometry, texture, material, DeathStar, TerraPlana;
+      let camera, scene, renderer, axesHelper, shaderMesh, controls;
+      let DeathStar, geometryD, textureD, materialD, geometryC, materialC, Raio;
+
+      const clock = new THREE.Clock(); //Rélogio
+
+      const uniforms = {
+        u_resolution: { type: "v2", value: new THREE.Vector2() }, // Resolução da janela
+        u_time: { type: "f", value: 0.0 }, // Cronómetro
+      }
+      //Criação da Estrela da morte e do raio
+      function createObjects(){
+        geometryD = new THREE.SphereGeometry(1, 20, 20);
+        textureD = new THREE.TextureLoader().load('textures/DeathStar.png');
+        materialD = new THREE.MeshBasicMaterial({ map: textureD });
+        DeathStar = new THREE.Mesh(geometryD, materialD);
+        scene.add(DeathStar);
+
+        DeathStar.position.x = 4.0;
+        DeathStar.position.y = 1.0;
+        DeathStar.rotation.y = 3.0;
+        DeathStar.rotation.x = 0.5;
+        DeathStar.rotation.z = -0.5;
+
+        const geometryC = new THREE.CylinderGeometry( 0.1, 0.1, 1, 32 );
+        const materialC = new THREE.MeshBasicMaterial( {color: 0x00ff00} );
+        Raio = new THREE.Mesh( geometryC, materialC );
+        
+        Raio.position.x = 4.0;
+        Raio.position.y = 1.0;
+        Raio.rotation.x = 1.55;
+        Raio.rotation.z = 0.8;
+        scene.add(Raio);
+      }
+
+      function createShaderObject(){
+        const vertexShader = `
+          uniform float u_time; 
+          void main() { 
+            float num = u_time;
+            if (num > 3.0) {
+              num = 0.0;
+            }
+            vec3 scale = vec3(num, num, num);
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position * scale, 1.0);
+          }
+        `;
+
+        const pixelShader = `
+          uniform float u_time; 
+          void main() { 
+            gl_FragColor = vec4(1.0, abs(sin(u_time)), 0.0, 1.0); 
+          }
+        `; // Varia entre 0-1-0. R-G-B - 1-1-0
+
+        //Geometria e material
+        const geometryP = new THREE.SphereGeometry(1, 100, 100);
+        const materialP = new THREE.ShaderMaterial({ 
+          vertexShader: vertexShader, // Primeiro a ser executado, recebe as informações geométricas de cada vertice
+          fragmentShader: pixelShader, // Trabalha alterando nosso objeto pixel por pixel 
+          uniforms });  // Contém os dados comuns definidos pra todo vértice       
+        shaderMesh = new THREE.Mesh(geometryP, materialP); //Criação da malha
+        scene.add(shaderMesh);
+        shaderMesh.position.set(0, 1, 4);
+      }
 
       function init(){
         scene = new THREE.Scene(); 
@@ -30,40 +92,22 @@
         renderer.setSize(SCREEN_WIDTH, SCREEN_HEIGHT);
         document.body.appendChild(renderer.domElement);
 
-        axesHelper = new THREE.AxesHelper(1000);
+        axesHelper = new THREE.AxesHelper(100);
         scene.add(axesHelper); 
 
         window.addEventListener('resize', onWindowResize);
 
-        controls = new FlyControls(camera, renderer.domElement);
-        controls.object = camera; // Camera a ser controlada
-        controls.domElement = renderer.domElement; // Serve para ler os comandos do mouse
-        controls.autoForward = false; // Para que a camera não se mova sozinha, apenas com o click.
-        controls.dragToLook = false; // Para o cursor do mouse rotacionar a camera
-        controls.movementSpeed = 0.1; // Velocidade de movimento da camera
-        controls.rollSpeed = 0.03; // Velocidade de rotação
+        controls = new OrbitControls( camera, renderer.domElement );
+        controls.target.set(0, 0, 0);
+        controls.minDistance = 3.0;
+        controls.maxDistance = 30.0;
+        controls.update();
+
+        createShaderObject();
+
+        uniforms.u_resolution.value.x = SCREEN_WIDTH;
+        uniforms.u_resolution.value.y = SCREEN_HEIGHT;
       }
-
-      function createPlanet(){
-        geometry = new THREE.SphereGeometry(1, 20, 20);
-        texture = new THREE.TextureLoader().load('textures/DeathStar.png');
-        material = new THREE.MeshBasicMaterial({ map: texture });
-        DeathStar = new THREE.Mesh(geometry, material);
-        scene.add(DeathStar);
-
-        DeathStar.position.x = 3;
-        DeathStar.position.y = 2;
-      }
-
-      function createFlatEarth(){
-        geometry = new THREE.CircleGeometry(1, 20);
-        texture = new THREE.TextureLoader().load('textures/FlatEarth.png');
-        material = new THREE.MeshBasicMaterial({ map: texture});
-        TerraPlana = new THREE.Mesh(geometry, material);
-        scene.add(TerraPlana);
-          
-        TerraPlana.position.x = 1;
-      }  
 
       function onWindowResize(){
         SCREEN_WIDTH = window.innerWidth;
@@ -72,59 +116,32 @@
         renderer.setSize(SCREEN_WIDTH, SCREEN_HEIGHT);
         active_camera.aspect = aspect_ratio;
         active_camera.updateProjectionMatriX();
-      }
-      
-      let cont = 0;
-      let cont2 = 0;
-      
-      function Movimento(){
-        cont++;
-        if (cont < 40){
-          DeathStar.position.x = DeathStar.position.x - 0.08
-          DeathStar.position.z = DeathStar.position.z + 0.08
-        }else if (cont >= 40 && cont < 80){
-          DeathStar.position.x = DeathStar.position.x - 0.08
-          DeathStar.position.z = DeathStar.position.z - 0.08
-        }else if (cont >= 80 && cont < 120){
-          DeathStar.position.x = DeathStar.position.x + 0.08
-          DeathStar.position.z = DeathStar.position.z - 0.08
-        }else if (cont >= 120 && cont < 160){
-          DeathStar.position.x = DeathStar.position.x + 0.08
-          DeathStar.position.z = DeathStar.position.z + 0.08
-        }else{
-          cont = 0;
-        }
-        DeathStar.rotation.y -= 0.05;
-
-        cont2++;
-        if (cont2 < 30){
-          TerraPlana.position.x = TerraPlana.position.x - 0.05
-          TerraPlana.position.y = TerraPlana.position.y + 0.05
-        }else if (cont2 >= 30 && cont2 < 60){
-          TerraPlana.position.x = TerraPlana.position.x - 0.05
-          TerraPlana.position.y = TerraPlana.position.y - 0.05
-        }else if (cont2 >= 60 && cont2 < 90){
-          TerraPlana.position.x = TerraPlana.position.x + 0.05
-          TerraPlana.position.y = TerraPlana.position.y - 0.05
-        }else if (cont2 >= 90 && cont2 < 120){
-          TerraPlana.position.x = TerraPlana.position.x + 0.05
-          TerraPlana.position.y = TerraPlana.position.y + 0.05
-        }else{
-          cont2 = 0;
-        }
-        TerraPlana.rotation.z += 0.06;
+        uniforms.u_resolution.value.x = SCREEN_WIDTH;
+        uniforms.u_resolution.value.y = SCREEN_HEIGHT;
       }
 
+      
       const animate = function () {
         requestAnimationFrame(animate);
-        Movimento();
-        controls.update(1);
+
+        Raio.position.x = Raio.position.x - 0.01;
+        Raio.position.z = Raio.position.z + 0.01;
+
+        if(Raio.position.z > 4.0 && Raio.position.x < 1.0){
+          Raio.visible = false;
+        }
+
+        if(clock.getElapsedTime() > 5.0){
+          uniforms.u_time.value = (clock.getElapsedTime() / 5);
+        }else{
+          uniforms.u_time.value = 1.0; //Setar o tamanho do planeta
+        }
+      
         renderer.render(scene, camera);
       };
-
+      
       init();
-      createPlanet();
-      createFlatEarth();
+      createObjects();
       animate();
     </script>
   </body>
